@@ -3,3 +3,7 @@ db
 
 # Local config
 config.yaml
+
+# Built binaries
+let-offer-notify
+*.exe
