@@ -61,6 +61,14 @@ func main() {
 	}
 	defer page.Close()
 
+	// Add route to intercept all requests to disable caching
+	err = page.Route("**", func(r playwright.Route) {
+		r.Continue()
+	})
+	if err != nil {
+		log.Fatalf("Failed to add route: %v", err)
+	}
+
 	// Open and prepare the database
 	dbopts := badger.DefaultOptions("db")
 	dbopts.Logger = nil
@@ -173,12 +181,12 @@ func FetchAndProcessRSSFeed() {
 	log.Info("Fetching RSS feed...")
 	result, err := FetchRSSFeed()
 	if err != nil {
-		log.Error("Failed to fetch RSS feed", "error", err)
+		log.Fatal("Failed to fetch RSS feed", "error", err)
 	}
 	log.Info("Processing RSS feed...")
 	err = ProcessRSSFeed(result)
 	if err != nil {
-		log.Error("Failed to process RSS feed", "error", err)
+		log.Fatal("Failed to process RSS feed", "error", err)
 	}
 	log.Info("Done!")
 }
