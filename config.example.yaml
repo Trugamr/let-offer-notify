@@ -1,0 +1,4 @@
+ntfy:
+  topic_url: https://ntfy.sh/my-topic
+  username: my-username
+  password: my-password

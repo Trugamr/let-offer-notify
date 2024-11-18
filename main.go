@@ -1,21 +1,33 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/xml"
+	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/charmbracelet/log"
 	badger "github.com/dgraph-io/badger/v4"
 	"github.com/playwright-community/playwright-go"
+	"github.com/trugamr/let-offer-notify/config"
 )
 
 var page playwright.Page
 var db *badger.DB
+var cfg *config.Config
 
 func main() {
+	// Load config
+	cfg = config.NewConfig()
+	if err := cfg.Load(); err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
 	// Pre-install the browser binaries
 	err := playwright.Install(&playwright.RunOptions{
 		Browsers: []string{"chromium"},
@@ -31,6 +43,8 @@ func main() {
 	}
 	defer pw.Stop()
 
+	// TODO: Handle browser close event and exit
+	// Running in headful mode prevents cloudflare from blocking the request
 	headless := false
 	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
 		Headless: &headless,
@@ -132,8 +146,18 @@ func ProcessRSSFeed(result *RSSFeed) error {
 			}
 
 			if notify {
-				// TODO: Send notification using `ntfy`
 				log.Info("New item", "title", item.Title, "guid", item.Guid, "link", item.Link)
+
+				// Send notification using `ntfy`
+				notification := Notification{
+					Title: item.Title,
+					Body:  string('\u200b'), // Zero-width space
+					URL:   &item.Link,
+				}
+				err = SendNotification(notification)
+				if err != nil {
+					log.Error("Failed to send notification", "err", err)
+				}
 			}
 			return nil
 		})
@@ -157,4 +181,43 @@ func FetchAndProcessRSSFeed() {
 		log.Error("Failed to process RSS feed", "error", err)
 	}
 	log.Info("Done!")
+}
+
+type Notification struct {
+	Title string
+	Body  string
+	URL   *string
+}
+
+func SendNotification(n Notification) error {
+	client := &http.Client{}
+
+	req, err := http.NewRequest(http.MethodPost, cfg.Ntfy.TopicURL, strings.NewReader(n.Body))
+	if err != nil {
+		return err
+	}
+
+	// Set authorization header
+	authorization := fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", cfg.Ntfy.Username, cfg.Ntfy.Password))))
+	req.Header.Set("Authorization", authorization)
+
+	req.Header.Set("Title", n.Title)
+
+	// Add click action if URL is provided
+	if n.URL != nil {
+		req.Header.Set("Click", *n.URL)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Check if request was successful
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to send notification: %s", resp.Status)
+	}
+
+	return nil
 }

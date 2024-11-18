@@ -1,2 +1,5 @@
 # Local database
 db
+
+# Local config
+config.yaml
