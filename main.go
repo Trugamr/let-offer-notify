@@ -44,7 +44,6 @@ func main() {
 	defer pw.Stop()
 
 	// TODO: Handle browser close event and exit
-	// Running in headful mode prevents cloudflare from blocking the request
 	headless := false
 	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
 		Headless: &headless,
@@ -55,7 +54,10 @@ func main() {
 	defer browser.Close()
 
 	// Keep a page open to keep the browser alive
-	page, err = browser.NewPage()
+	device := pw.Devices["Desktop Chrome"]
+	page, err = browser.NewPage(playwright.BrowserNewPageOptions{
+		UserAgent: &device.UserAgent,
+	})
 	if err != nil {
 		log.Fatalf("Failed to create page: %v", err)
 	}

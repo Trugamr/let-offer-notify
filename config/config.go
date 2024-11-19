@@ -31,11 +31,10 @@ func (c *Config) Load() error {
 	_ = viper.BindEnv("ntfy.password")
 
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			// Config file not found; ignore error if desired
-			return nil
+			return err
 		}
-		return err
 	}
 
 	// Unmarshal into the Config struct
